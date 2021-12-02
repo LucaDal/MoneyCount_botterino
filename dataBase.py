@@ -1,6 +1,7 @@
 import sqlite3
 from sqlite3 import Error
 
+
 def create_connection():
     db_file = r"MoneyCount_tables.db"
     """ create a database connection to the SQLite database
@@ -31,12 +32,13 @@ def create_table(conn, create_table_sql):
         print(e)
 
 
-def sql_table_statment(conn):
+def sql_table_statment(
+        conn):  # TODO aggiungere id_group alle transizioni perche se ho piu persone in gruppi diversi -> crasha il db
     sql_create_user_table = """CREATE TABLE IF NOT EXISTS user (
                                 id_user integer,
                                 name text NOT NULL,
                                 username text NOT NULL,
-                                portfoglio real DEFAULT 0,
+                                portfolio real DEFAULT 0,
                                 id_group integer,
                                 PRIMARY KEY(id_user,id_group)
                                 );"""
@@ -58,7 +60,7 @@ def is_user_on_db(conn, id_user, id_group):
     cur = conn.cursor()
     cur.execute("SELECT COUNT(1) FROM user WHERE ? = id_user AND ? = id_group", (id_user, id_group))
     value = cur.fetchall()
-    if (value[0][0] == 1):
+    if value[0][0] == 1:
         return True
 
 
@@ -73,27 +75,32 @@ def is_username_on_db(conn, username, id_group):
 def insert_user_into_db(conn, user):
     """
     Create a new user into the user table
-    user = (id_user,name,username,portfoglio,id_group)
+    user = (id_user,name,username,portfolio,id_group)
     :return: -1 if is already into the same group
     """
-    if (is_user_on_db(conn, user[0], user[4])):
+    if is_user_on_db(conn, user[0], user[4]):
         return -1
     else:
-        sql = ''' INSERT INTO user(id_user,name,username,portfoglio,id_group) VALUES(?,?,?,?,?) '''
+        sql = ''' INSERT INTO user(id_user,name,username,portfolio,id_group) VALUES(?,?,?,?,?) '''
         deploy_commit(conn, sql, user)
         return 0
 
 
-def insert_transactions_into_db(conn, caller, list_usernames, value):
+def insert_transactions_into_db(conn, caller, list_usernames, value, id_group):
     """
     Create a new conto into the transaction table
     passare id,payer,payer,value
     """
-    for username in list_usernames:
+    for debtor in list_usernames:
         sql = ''' INSERT INTO transactions(payer,debtor,value)
             VALUES(?,?,?) '''
-        print("inserisco la query {}".format(sql))
-        deploy_commit(conn, sql, (caller, username, value))
+        update_portfolio(conn, debtor, value, id_group)
+        deploy_commit(conn, sql, (caller, debtor, value))
+
+
+def update_portfolio(conn, id_user, value, id_group):
+    sql = ''' UPDATE user set portfolio = portfolio ADD ? WHERE id_user = ? AND id_group = ? '''
+    deploy_commit(conn, sql, (value, id_user, id_group))
 
 
 def deploy_commit(conn, sql, obg):
@@ -122,4 +129,3 @@ def call_create_tables():
     # create a new project
     #     user = ()
     #     insert_user(conn, user)
-
