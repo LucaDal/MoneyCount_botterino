@@ -48,9 +48,9 @@ def query():
     conn = db.create_connection()
     cur = conn.cursor()
     add_Lorenzo_sql = "INSERT INTO user(id_user,name,username,id_group) VALUES(876947202, 'Straptoc', 'Straptoc', -648429536)"
-    add_user_sql = "INSERT INTO user(id_user,name,username,id_group) VALUES(1, 'bot1', 'bot1', 461718130)"
-    to_debug = "INSERT INTO transactions(id_payer,id_debtor,id_group,value) VALUES(1,461718130,461718130,10)"
-    cur.execute(add_user_sql)
+    add_user_sql = "INSERT INTO user(id_user,name,username,id_group) VALUES(3, 'bot3', 'bot3', 461718130)"
+    to_debug = "INSERT INTO transactions(id_payer,id_debtor,id_group,value) VALUES(3,461718130,461718130,17.45)"
+    cur.execute(to_debug)
     val = cur.fetchall()
     print(val)
     conn.commit()

@@ -104,6 +104,12 @@ def get_id_from_username(conn, username):
     return execute_sql_without_commit(conn, sql, (username,))[0][0]
 
 
+def remove_transactions_between(conn, id_payer, id_debtor, id_group):
+    sql = "DELETE FROM transactions WHERE id_payer = ? AND id_debtor = ? AND id_group = ?"
+    deploy_commit(conn, sql, (id_payer, id_debtor, id_group))
+    deploy_commit(conn, sql, (id_debtor, id_payer, id_group))
+
+
 def get_balance_from(conn, id_payer, debtor, id_group):
     """
     will return the amount that the debtor has to give you
@@ -119,6 +125,14 @@ def get_balance_from(conn, id_payer, debtor, id_group):
         val_debtor = 0
     return float(val_caller) - float(val_debtor)
 
+
+def get_list_user_group(conn, id_group):
+    sql = "SELECT username FROM user WHERE id_group = ?"
+    row = execute_sql_without_commit(conn, sql, (id_group,))
+    user_list = []
+    for user in row:
+        user_list.append(user[0])
+    return user_list
 
 def execute_sql_without_commit(conn, sql, obg):
     """
