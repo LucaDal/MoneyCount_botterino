@@ -38,18 +38,18 @@ def sql_table_statment(
                                 id_user integer,
                                 name text NOT NULL,
                                 username text NOT NULL,
-                                portfolio real DEFAULT 0,
                                 id_group integer,
                                 PRIMARY KEY(id_user,id_group)
                                 );"""
 
     sql_create_transactions_table = """ CREATE TABLE IF NOT EXISTS transactions (
                                   id integer PRIMARY KEY,
-                                  payer integer NOT NULL,
-                                  debtor integer NOT NULL,
+                                  id_payer integer NOT NULL,
+                                  id_debtor integer NOT NULL,
+                                  id_group integer NOT NULL,
                                   value real,
-                                  FOREIGN KEY (payer) REFERENCES user(id_user),
-                                  FOREIGN KEY (debtor) REFERENCES user(id_user)
+                                  FOREIGN KEY (id_payer) REFERENCES user(id_user),
+                                  FOREIGN KEY (id_debtor) REFERENCES user(id_user)
                                   );
                                   """
     deploy_tables(conn, sql_create_user_table)
@@ -78,29 +78,58 @@ def insert_user_into_db(conn, user):
     user = (id_user,name,username,portfolio,id_group)
     :return: -1 if is already into the same group
     """
-    if is_user_on_db(conn, user[0], user[4]):
+    if is_user_on_db(conn, user[0], user[3]):
         return -1
     else:
-        sql = ''' INSERT INTO user(id_user,name,username,portfolio,id_group) VALUES(?,?,?,?,?) '''
+        sql = ''' INSERT INTO user(id_user,name,username,id_group) VALUES(?,?,?,?) '''
         deploy_commit(conn, sql, user)
         return 0
 
 
-def insert_transactions_into_db(conn, caller, list_usernames, value, id_group):
+def insert_transactions_into_db(conn, id_caller, list_usernames, value, id_group):
     """
-    Create a new conto into the transaction table
+    Create a new transaction into the transaction table
+    and it will update the portfolio directly
     passare id,payer,payer,value
+    :param: caller: the username of the caller
+    :param: list_usernames:
     """
     for debtor in list_usernames:
-        sql = ''' INSERT INTO transactions(payer,debtor,value)
-            VALUES(?,?,?) '''
-        update_portfolio(conn, debtor, value, id_group)
-        deploy_commit(conn, sql, (caller, debtor, value))
+        sql = ''' INSERT INTO transactions(id_payer,id_debtor,id_group,value) VALUES(?,?,?,?) '''
+        deploy_commit(conn, sql, (id_caller, get_id_from_username(conn, debtor), id_group, value))
 
 
-def update_portfolio(conn, id_user, value, id_group):
-    sql = ''' UPDATE user set portfolio = portfolio ADD ? WHERE id_user = ? AND id_group = ? '''
-    deploy_commit(conn, sql, (value, id_user, id_group))
+def get_id_from_username(conn, username):
+    sql = "SELECT id_user FROM user WHERE username = ?"
+    return execute_sql_without_commit(conn, sql, (username,))[0][0]
+
+
+def get_balance_from(conn, id_payer, debtor, id_group):
+    """
+    will return the amount that the debtor has to give you
+    """
+    id_debtor = get_id_from_username(conn, debtor)
+    sql = "SELECT SUM(value) FROM transactions WHERE id_payer = ? AND id_debtor = ? AND id_group = ?"
+    val_caller = execute_sql_without_commit(conn, sql, (id_payer, id_debtor, id_group))[0][0]
+    if val_caller is None:
+        val_caller = 0
+    sql = "SELECT SUM(value) FROM transactions WHERE id_payer = ? AND id_debtor = ? AND id_group = ?"
+    val_debtor = execute_sql_without_commit(conn, sql, (id_debtor, id_payer, id_group))[0][0]
+    if val_debtor is None:
+        val_debtor = 0
+    return float(val_caller) - float(val_debtor)
+
+
+def execute_sql_without_commit(conn, sql, obg):
+    """
+    :param conn:
+    :param sql: query
+    :param obg: tuple with value to insert into the query
+    :return: the list fetched
+    """
+    cur = conn.cursor()
+    cur.execute(sql, obg)
+    return cur.fetchall()
 
 
 def deploy_commit(conn, sql, obg):
@@ -124,8 +153,3 @@ def call_create_tables():
         sql_table_statment(conn)
     else:
         print("Error! cannot create the database connection.")
-
-    # with conn:
-    # create a new project
-    #     user = ()
-    #     insert_user(conn, user)
