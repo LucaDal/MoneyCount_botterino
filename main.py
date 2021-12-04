@@ -34,7 +34,7 @@ def help_message(message):
                "/balanceWith <username> || 'all'\nI'll balance your count to 0€ with someone if you're in credit." \
                "\n-----------------\n" \
                "/updateMe\nI'll update you're username if you change it.\n-----------------\n" \
-               "# If you don't get any response probably you've missed something, " \
+               "# usernames must begin with @\n# If you don't get any response probably you've missed something, " \
                "or maybe I'm dead.\n# Negative numbers are't allowed."
     bot.send_message(message.chat.id, help_mes)
 
