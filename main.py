@@ -24,25 +24,29 @@ def start(message):
 @bot.message_handler(commands=['help'])
 def help_message(message):
     help_mes = "/addMe\nNeeded to use me\n-----------------\n" \
-               "/addExEqually <value> <username>[other usernames]\nIt'll add the value divided by you and others in " \
-               "their account(you're excluded)\n-----------------\n" \
-               "/addExTo <value> <username>\nSet an expense just for someone(entire price added to him)\n-----------------\n"\
-               "/balanceWith <username>\nIt will tell you the balance between you and the username\n-----------------\n" \
-               "/balanceGroup\nIt will tell the balance between you and each one of the group"
+               "/addExEqTo <value> <username>[other usernames] || 'all'\nI'll add the price divided by you and " \
+               "others to their account\n-----------------\n" \
+               "/addExTo <value> <username>\nSet an expense just for someone(entire price added to " \
+               "him)\n-----------------\n" \
+               "/debitWith <username>\nI'll tell you the balance between you and the username\n-----------------\n" \
+               "/debitGroup\nI'll tell the balance between you and each one of the group\n-----------------\n" \
+               "/balanceWith <username> || 'all'\nI'll balance your count to 0€ with someone if you're in credit" \
+               "\n-----------------\n# If you don't get any response probably you've missed something, " \
+               "or maybe I'm dead.\n# Negative numbers are't allowed."
     bot.send_message(message.chat.id, help_mes)
 
 
-@bot.message_handler(commands=['addExEqually'])
+@bot.message_handler(commands=['addExEqTo'])
 def add_equal_to(message):
     """
     aggiungi a tutti la spesa in modo uguale - tranne a chi la chiama
     """
-    conn = is_all_right(message)
+    conn = is_connection_all_right(message)
     if conn is False:
         return
     message_as_list = get_list_from_message(message)
     if len(message_as_list) == 0:
-        bot.send_message(message.chat.id, "Bro, i need one username")
+        bot.send_message(message.chat.id, "Bro, i need one username or type 'all'")
         return
     price_to_divide = return_value_if_correct(message_as_list[0])
     if price_to_divide is None:
@@ -51,33 +55,86 @@ def add_equal_to(message):
     elif price_to_divide == 0:
         bot.send_message(message.chat.id, "Brutto coglione, non provarci mai più!")
         return
-    users_called = return_list_of_usernames_if_correct_first_value_is_numeric(conn, message, message_as_list)
-    if users_called is None:
-        return
-    value = truncate(price_to_divide / (len(message_as_list)))
+    caller = message.from_user.username
+    users_called = []
+    dividendo = 0
+    if message_as_list[1] == "all":
+        users_called = db.get_list_user_group(conn, message.chat.id)
+        dividendo = len(users_called)
+        users_called.remove(caller)
+        if users_called is None:
+            bot.send_message(message.chat.id, "No users to add the expense")
+            return
+    else:
+        users_called = return_list_of_usernames_if_correct_first_value_is_numeric(conn, message, message_as_list)
+        if users_called is None:
+            return
+        dividendo = len(message_as_list)
+    value = truncate(price_to_divide / dividendo)
     try:
         db.insert_transactions_into_db(conn, message.from_user.id, users_called, float(value), message.chat.id)
     except:
         bot.send_message(message.chat.id, "Something went wrong diomaialo")
         return
-    str_user = ""
-    len_list = len(users_called)
-    for i in range(len_list):
-        if i == len_list or i == 0:
-            div = ""
-        else:
-            div = ","
-        str_user = "{}{} {}".format(str_user, div, users_called[i])
-    bot.send_message(message.chat.id, "{} ha indebitato{} di:\n{}€".format(message.from_user.username, str_user, value))
+    str_user = get_string_of_usernames(users_called)
+    bot.send_message(message.chat.id,
+                     "{} ha indebitato{} di:\n{}€".format(message.from_user.username, str_user, value, 2))
     conn.close()
 
 
-@bot.message_handler(commands=['addExTo'])
-def add_to(message):
+def get_string_of_usernames(usernames_list):
+    str_user = ""
+    for i in range(len(usernames_list)):
+        if i == usernames_list or i == 0:
+            div = ""
+        else:
+            div = ","
+        str_user = "{}{} {}".format(str_user, div, usernames_list[i])
+    return str_user
+
+
+@bot.message_handler(commands=['balanceWith'])
+def balance_with(message):
+    conn = is_connection_all_right(message)
+    if conn is None:
+        return
+    list_from_msg = get_list_from_message(message)
+    list_debtors = []
+    caller = message.from_user.username
+    if list_from_msg[0] == "all":
+        for user in db.get_list_user_group(conn, message.chat.id):
+            if user != caller:
+                euro = db.get_balance_from(conn, message.from_user.id, user,
+                                           message.chat.id)
+                if euro > 0:
+                    list_debtors.append(user)
+                    db.remove_transactions_between(conn, message.from_user.id, db.get_id_from_username(conn, user),
+                                                   message.chat.id)
+    else:
+        user_in_list = return_list_of_usernames_if_correct(conn, message, list_from_msg)
+        if user_in_list is None:
+            return
+        if len(user_in_list) != 1:
+            bot.send_message(message.chat.id, "I will consider just the first username")
+        euro = db.get_balance_from(conn, message.from_user.id, user_in_list[0],
+                                   message.chat.id)
+        if euro > 0:
+            list_debtors.append(user_in_list[0])
+            db.remove_transactions_between(conn, message.from_user.id, db.get_id_from_username(conn, user_in_list[0]),
+                                           message.chat.id)
+    str_username = get_string_of_usernames(list_debtors)
+    if str_username == "":
+        bot.send_message(message.chat.id, "Nothing to balance")
+    else:
+        bot.send_message(message.chat.id, "Count balanced with:\n{}".format(str_username))
+
+
+def get_value_and_username_connection(message):
     """
-    inserisce la spesa solo ad una persona
+    handled error within this function
+    :return: the first value of the string, one single username(if more it will advise the user) and the connection
     """
-    conn = is_all_right(message)
+    conn = is_connection_all_right(message)
     if conn is False:
         return
     message_as_list = get_list_from_message(message)
@@ -94,54 +151,72 @@ def add_to(message):
     if len(username) != 1:
         bot.send_message(message.chat.id, "Give me just one username")
         return
+    return val, username, conn
+
+
+@bot.message_handler(commands=['addExTo'])
+def add_to(message):
+    """
+    inserisce la spesa solo ad una persona
+    """
+    return_value = get_value_and_username_connection(message)
+    if return_value is None:
+        return
+    val = return_value[0]
+    username = return_value[1]
+    conn = return_value[2]
     try:
         db.insert_transactions_into_db(conn, message.from_user.id, username, float(val), message.chat.id)
     except:
         bot.send_message(message.chat.id, "Something went wrong diomaialo")
         return
-    bot.send_message(message.chat.id, "Expense added to{}".format(username[0]))
+    bot.send_message(message.chat.id, "Expense added to {}".format(username[0]))
     conn.close()
 
 
-@bot.message_handler(commands=['balanceGroup'])
-def get_balance(message):
+@bot.message_handler(commands=['debitGroup'])
+def get_debit_group(message):
     """
     print into the chat the balance of each one
     """
-    conn = is_all_right(message)
+    conn = is_connection_all_right(message)
     if conn is False:
         return
     list_group = db.get_list_user_group(conn, message.chat.id)
     list_group.remove(message.from_user.username)
+    message.text = ""
+    # is needed otherwise when i call get_balance_with it will search for usernames into this text
     for user in list_group:
-        get_balance_with(message, user)
+        get_balance_with(message, user, True)
+    conn.close()
 
 
-@bot.message_handler(commands=['balanceWith'])
-def get_balance_with(message, user=""):
+@bot.message_handler(commands=['debitWith'])
+def get_balance_with(message, user="", called_by_debit_group=False):
     """
     print into the chat the balance of each one
     """
-    conn = is_all_right(message)
+    conn = is_connection_all_right(message)
     if conn is False:
         return
-    message_as_list = get_list_from_message(message)
-    user_called = return_list_of_usernames_if_correct(conn, message, message_as_list)
+    user_called = []
+    if called_by_debit_group is False:
+        user_called = return_list_of_usernames_if_correct(conn, message, get_list_from_message(message))
+    else:
+        user_called = None
     if user_called is None:
         if user != "":
             user_called = [user]
-        else:
-            bot.send_message(message.chat.id, "Bro, i need one username")
             return
     if len(user_called) != 1:
         bot.send_message(message.chat.id, "Gimme just one username ")
         return
     try:
-        bal = db.get_balance_from(conn, message.from_user.id, user_called[0], message.chat.id)
+        bal = truncate(db.get_balance_from(conn, message.from_user.id, user_called[0], message.chat.id), 2)
         if bal < 0:
             bot.send_message(message.chat.id, "Sei in crick con {} di:\n{}€".format(user_called[0], bal))
         elif bal == 0:
-            bot.send_message(message.chat.id, "non sei in crick con {}:\n{}€, gg".format(user_called[0], 0))
+            bot.send_message(message.chat.id, "non sei in crick con {}:\n{}€ - gj".format(user_called[0], 0))
             db.remove_transactions_between(conn, message.from_user.id, db.get_id_from_username(conn, user_called[0]),
                                            message.chat.id)
         else:
@@ -276,7 +351,7 @@ def are_username_in_db(conn, message, users_called):
     return True
 
 
-def is_all_right(message):
+def is_connection_all_right(message):
     """
     :param message:
     :return: False id something fails, the connection instead
@@ -303,4 +378,5 @@ def is_caller_on_db(conn, id_chat, users_caller):
     return True
 
 
-bot.polling()
+bot.infinity_polling(timeout=10, long_polling_timeout=5)
+# bot.polling()
