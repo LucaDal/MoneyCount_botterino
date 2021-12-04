@@ -35,7 +35,7 @@ def help_message(message):
                "\n-----------------\n" \
                "/updateMe\nI'll update you're username if you change it.\n-----------------\n" \
                "# usernames must begin with @.\n# If you don't get any response probably you've missed something, " \
-               "or maybe I'm dead.\n# Negative numbers are't allowed."
+               "or maybe I'm dead.\n# Negative numbers aren't allowed."
     bot.send_message(message.chat.id, help_mes)
 
 
