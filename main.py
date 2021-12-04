@@ -18,20 +18,23 @@ def info(message):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "Nice, I'll take account your debts \nbut first write /addMe")
+    bot.send_message(message.chat.id, "Hi buddy, these are the commands:")
+    help_message(message)
 
 
 @bot.message_handler(commands=['help'])
 def help_message(message):
-    help_mes = "/addMe\nNeeded to use me\n-----------------\n" \
-               "/addExEqTo <value> <username>[other usernames] || 'all'\nI'll add the price divided by you and " \
-               "others to their account\n-----------------\n" \
+    help_mes = "/addMe\nNeeded to use me.\n-----------------\n" \
+               "/addExEqTo <value> <username>[other usernames] || 'all'\nI'll add the price Equally  divided by you " \
+               "and others to their account.\n-----------------\n" \
                "/addExTo <value> <username>\nSet an expense just for someone(entire price added to " \
-               "him)\n-----------------\n" \
-               "/debitWith <username>\nI'll tell you the balance between you and the username\n-----------------\n" \
-               "/debitGroup\nI'll tell the balance between you and each one of the group\n-----------------\n" \
-               "/balanceWith <username> || 'all'\nI'll balance your count to 0€ with someone if you're in credit" \
-               "\n-----------------\n# If you don't get any response probably you've missed something, " \
+               "him).\n-----------------\n" \
+               "/debitWith <username>\nI'll tell you the balance between you and the username.\n-----------------\n" \
+               "/debitGroup\nI'll tell the balance between you and each one of the group.\n-----------------\n" \
+               "/balanceWith <username> || 'all'\nI'll balance your count to 0€ with someone if you're in credit." \
+               "\n-----------------\n" \
+               "/updateMe\nI'll update you're username if you change it.\n-----------------\n" \
+               "# If you don't get any response probably you've missed something, " \
                "or maybe I'm dead.\n# Negative numbers are't allowed."
     bot.send_message(message.chat.id, help_mes)
 
@@ -136,21 +139,21 @@ def get_value_and_username_connection(message):
     """
     conn = is_connection_all_right(message)
     if conn is False:
-        return
+        return None
     message_as_list = get_list_from_message(message)
     if len(message_as_list) == 0:
         bot.send_message(message.chat.id, "Bro, i need one value and a username")
-        return
+        return None
     val = return_value_if_correct(message_as_list[0])
     if val is None:
         bot.send_message(message.chat.id, "First input needed is numeric moron")
-        return
+        return None
     username = return_list_of_usernames_if_correct_first_value_is_numeric(conn, message, message_as_list)
     if username is None:
-        return
+        return None
     if len(username) != 1:
         bot.send_message(message.chat.id, "Give me just one username")
-        return
+        return None
     return val, username, conn
 
 
@@ -174,6 +177,22 @@ def add_to(message):
     conn.close()
 
 
+@bot.message_handler(commands=['updateMe'])
+def update_username(message):
+    conn = db.create_connection()
+    if conn is None:
+        return
+    if db.is_username_on_db(conn, message.from_user.username, message.chat.id):
+        bot.send_message(message.chat.id, "Nothing to change")
+        return
+    elif db.is_user_on_db(conn, message.from_user.id, message.chat.id):
+        db.update_username(conn, message.from_user.id, message.chat.id, message.from_user.username)
+        bot.send_message(message.chat.id, "Username updated!")
+    else:
+        bot.send_message(message.chat.id, "You weren't into my db liar!")
+    conn.close()
+
+
 @bot.message_handler(commands=['debitGroup'])
 def get_debit_group(message):
     """
@@ -186,8 +205,12 @@ def get_debit_group(message):
     list_group.remove(message.from_user.username)
     message.text = ""
     # is needed otherwise when i call get_balance_with it will search for usernames into this text
-    for user in list_group:
-        get_balance_with(message, user, True)
+    if len(list_group) == 0:
+        for user in list_group:
+            get_balance_with(message, user, True)
+    else:
+        bot.send_message(message.chat.id, "Nobody into the group")
+
     conn.close()
 
 
@@ -236,7 +259,7 @@ def add_me(message):
         bot.send_message(message.chat.id, "Problems with data base")
         return
     try:
-        user = (message.from_user.id, message.from_user.first_name, message.from_user.username, message.chat.id)
+        user = (message.from_user.id, message.from_user.username, message.chat.id)
         if db.insert_user_into_db(conn, user) < 0:
             bot.send_message(message.chat.id, "Nope")
         else:
@@ -342,7 +365,7 @@ def are_username_in_db(conn, message, users_called):
         return None
     for user in users_called:
         if not db.is_username_on_db(conn, user, group_id):
-            bot.send_message(message.chat.id, "Bro pls, give me real usernames or tell them to use /addMe")
+            bot.send_message(message.chat.id, "Bro pls, give me real usernames or tell them to use /addMe or /updateMe")
             return None
         else:
             if user == caller:

@@ -36,7 +36,6 @@ def sql_table_statment(
         conn):  # TODO aggiungere id_group alle transizioni perche se ho piu persone in gruppi diversi -> crasha il db
     sql_create_user_table = """CREATE TABLE IF NOT EXISTS user (
                                 id_user integer,
-                                name text NOT NULL,
                                 username text NOT NULL,
                                 id_group integer,
                                 PRIMARY KEY(id_user,id_group)
@@ -62,28 +61,35 @@ def is_user_on_db(conn, id_user, id_group):
     value = cur.fetchall()
     if value[0][0] == 1:
         return True
+    return False
 
 
 def is_username_on_db(conn, username, id_group):
     cur = conn.cursor()
     cur.execute("SELECT COUNT(1) FROM user WHERE ? = username AND ? = id_group", (username, id_group))
     value = cur.fetchall()
-    if (value[0][0] == 1):
+    if value[0][0] == 1:
         return True
+    return False
 
 
 def insert_user_into_db(conn, user):
     """
     Create a new user into the user table
-    user = (id_user,name,username,portfolio,id_group)
+    user = (id_user,username,id_group)
     :return: -1 if is already into the same group
     """
-    if is_user_on_db(conn, user[0], user[3]):
+    if is_user_on_db(conn, user[0], user[2]):
         return -1
     else:
-        sql = ''' INSERT INTO user(id_user,name,username,id_group) VALUES(?,?,?,?) '''
+        sql = ''' INSERT INTO user(id_user,username,id_group) VALUES(?,?,?) '''
         deploy_commit(conn, sql, user)
         return 0
+
+
+def update_username(conn, id_user, id_group,username):
+    sql = "UPDATE user SET username = ? WHERE id_user = ? AND id_group = ?"
+    deploy_commit(conn, sql,(username,id_user,id_group))
 
 
 def insert_transactions_into_db(conn, id_caller, list_usernames, value, id_group):
@@ -133,6 +139,7 @@ def get_list_user_group(conn, id_group):
     for user in row:
         user_list.append(user[0])
     return user_list
+
 
 def execute_sql_without_commit(conn, sql, obg):
     """

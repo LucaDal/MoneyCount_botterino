@@ -2,11 +2,6 @@ import dataBase as db
 import os
 import sys
 
-
-def create():
-    print("Cristo")
-
-
 def delete_tables():
     os.remove("MoneyCount_tables.db")
     print("tables removed")
@@ -37,7 +32,7 @@ def print_tables():
     cur.close()
     conn.close()
 
-def test():
+def create():
     if not os.path.exists("./MoneyCount_tables.db"):
         f = open('MoneyCount_tables.db', 'w')
         f.close()
@@ -49,8 +44,8 @@ def query():
     cur = conn.cursor()
     add_Lorenzo_sql = "INSERT INTO user(id_user,name,username,id_group) VALUES(876947202, 'Straptoc', 'Straptoc', -648429536)"
     add_user_sql = "INSERT INTO user(id_user,name,username,id_group) VALUES(3, 'bot3', 'bot3', 461718130)"
-    to_debug = "INSERT INTO transactions(id_payer,id_debtor,id_group,value) VALUES(2,461718130,461718130,17.45)"
-    cur.execute(to_debug)
+    to_debug = "UPDATE user SET username = ? WHERE id_user = ? AND id_group = ?"
+    cur.execute(to_debug,('botterinonuovo',461718130,461718130))
     val = cur.fetchall()
     print(val)
     conn.commit()
