@@ -258,16 +258,13 @@ def add_me(message):
     if conn is None:
         bot.send_message(message.chat.id, "Problems with data base")
         return
-    try:
-        user = (message.from_user.id, message.from_user.username, message.chat.id)
-        if db.insert_user_into_db(conn, user) < 0:
-            bot.send_message(message.chat.id, "Nope")
-        else:
-            print("Aggiunto: {}".format(user))
-            bot.send_message(message.chat.id, "Oky, {}".format(message.from_user.first_name))
-            conn.close()
-    except:
-        bot.send_message(message.chat.id, "Wait, qualcosa non funge")
+    user = (message.from_user.id, message.from_user.username, message.chat.id)
+    if db.insert_user_into_db(conn, user) < 0:
+        bot.send_message(message.chat.id, "Nope")
+    else:
+        print("Aggiunto: {}".format(user))
+        bot.send_message(message.chat.id, "Oky, {}".format(message.from_user.first_name))
+        conn.close()
     conn.close()
 
 
