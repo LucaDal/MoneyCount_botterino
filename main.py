@@ -56,7 +56,7 @@ def add_equal_to(message):
         bot.send_message(message.chat.id, "Gimme money correctly bruh")
         return
     elif price_to_divide == 0:
-        bot.send_message(message.chat.id, "Brutto coglione, non provarci mai più!")
+        bot.send_message(message.chat.id, "Bro, non provarci mai più!")
         return
     caller = message.from_user.username
     users_called = []
@@ -148,6 +148,9 @@ def get_value_and_username_connection(message):
     if val is None:
         bot.send_message(message.chat.id, "First input needed is numeric moron")
         return None
+    elif val == 0:
+        bot.send_message(message.chat.id, "Oh c'mon, don't give me 0")
+        return None
     username = return_list_of_usernames_if_correct_first_value_is_numeric(conn, message, message_as_list)
     if username is None:
         return None
@@ -205,7 +208,7 @@ def get_debit_group(message):
     list_group.remove(message.from_user.username)
     message.text = ""
     # is needed otherwise when i call get_balance_with it will search for usernames into this text
-    if len(list_group) == 0:
+    if len(list_group) != 0:
         for user in list_group:
             get_balance_with(message, user, True)
     else:
