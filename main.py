@@ -208,6 +208,7 @@ def get_debit_group(message):
     list_group.remove(message.from_user.username)
     message.text = ""
     # is needed otherwise when i call get_balance_with it will search for usernames into this text
+    print(list_group)
     if len(list_group) != 0:
         for user in list_group:
             get_balance_with(message, user, True)
@@ -228,11 +229,12 @@ def get_balance_with(message, user="", called_by_debit_group=False):
     user_called = []
     if called_by_debit_group is False:
         user_called = return_list_of_usernames_if_correct(conn, message, get_list_from_message(message))
-    else:
-        user_called = None
-    if user_called is None:
+        if user_called is None:
+            return
+    if called_by_debit_group is True:
         if user != "":
-            user_called = [user]
+            user_called.append(user)
+        else:
             return
     if len(user_called) != 1:
         bot.send_message(message.chat.id, "Gimme just one username ")
@@ -240,13 +242,13 @@ def get_balance_with(message, user="", called_by_debit_group=False):
     try:
         bal = truncate(db.get_balance_from(conn, message.from_user.id, user_called[0], message.chat.id), 2)
         if bal < 0:
-            bot.send_message(message.chat.id, "Sei in crick con {} di:\n{}€".format(user_called[0], bal))
+            bot.send_message(message.chat.id, "Devi {}€\na: {}".format(abs(bal), user_called[0]))
         elif bal == 0:
-            bot.send_message(message.chat.id, "non sei in crick con {}:\n{}€ - gj".format(user_called[0], 0))
+            bot.send_message(message.chat.id, "Sei in pari con:\n{}".format(user_called[0]))
             db.remove_transactions_between(conn, message.from_user.id, db.get_id_from_username(conn, user_called[0]),
                                            message.chat.id)
         else:
-            bot.send_message(message.chat.id, "{} è in crick con te di:\n{}€".format(user_called[0], bal))
+            bot.send_message(message.chat.id, "{} ti deve:\n{}€".format(user_called[0], bal))
     finally:
         conn.close()
 
