@@ -208,7 +208,6 @@ def get_debit_group(message):
     list_group.remove(message.from_user.username)
     message.text = ""
     # is needed otherwise when i call get_balance_with it will search for usernames into this text
-    print(list_group)
     if len(list_group) != 0:
         for user in list_group:
             get_balance_with(message, user, True)
