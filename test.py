@@ -37,6 +37,8 @@ def create():
         f = open('MoneyCount_tables.db', 'w')
         f.close()
         db.call_create_tables()
+    else:
+        print("Table already exists")
 
 
 def query():

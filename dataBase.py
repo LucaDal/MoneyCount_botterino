@@ -19,22 +19,8 @@ def create_connection():
     return conn
 
 
-def create_table(conn, create_table_sql):
-    """ create a table from the create_table_sql statement
-    :param conn: Connection object
-    :param create_table_sql: a CREATE TABLE statement
-    :return:
-    """
-    try:
-        c = conn.cursor()
-        c.execute(create_table_sql)
-    except Error as e:
-        print(e)
-
-
-def sql_table_statment(
-        conn):  # TODO aggiungere id_group alle transizioni perche se ho piu persone in gruppi diversi -> crasha il db
-    sql_create_user_table = """CREATE TABLE IF NOT EXISTS user (
+def sql_table_statment(conn):
+    sql_create_user_table = """CREATE TABLE IF NOT EXISTS user(
                                 id_user integer,
                                 username text NOT NULL,
                                 id_group integer,
@@ -169,6 +155,7 @@ def deploy_tables(conn, sql):
 
 def call_create_tables():
     conn = create_connection()
+    print(conn)
     if conn is not None:
         print("sto creando le tabelle")
         sql_table_statment(conn)

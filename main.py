@@ -5,7 +5,8 @@ import json
 
 file = open(".env", "r")
 env = json.load(file)
-KEY_TOKEN = env['KEY_TOKEN']
+#KEY_TOKEN = env['KEY_TOKEN']
+KEY_TOKEN = "5088120040:AAGEbLgK1eXdykfFHUCOxP_ZC0Jhxf2JnSE"
 bot = telebot.TeleBot(KEY_TOKEN)
 file.close()
 
@@ -264,7 +265,7 @@ def add_me(message):
         return
     user = (message.from_user.id, message.from_user.username, message.chat.id)
     if db.insert_user_into_db(conn, user) < 0:
-        bot.send_message(message.chat.id, "Nope")
+        bot.send_message(message.chat.id, "You're in")
     else:
         print("Aggiunto: {}".format(user))
         bot.send_message(message.chat.id, "Oky, {}".format(message.from_user.first_name))
