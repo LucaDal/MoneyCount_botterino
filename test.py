@@ -2,13 +2,13 @@ import dataBase as db
 import os
 import sys
 
+
 def delete_tables():
     os.remove("MoneyCount_tables.db")
     print("tables removed")
 
 
 def main():
-
     arguments = sys.argv
     if len(arguments) != 2:
         exit(1)
@@ -31,6 +31,7 @@ def print_tables():
         print(val)
     cur.close()
     conn.close()
+
 
 def create():
     if not os.path.exists("./MoneyCount_tables.db"):
