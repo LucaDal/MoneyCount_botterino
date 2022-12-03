@@ -268,7 +268,7 @@ def add_me(message):
         return
     user = (message.from_user.id, message.from_user.username, message.chat.id)
     if db.insert_user_into_db(conn, user) < 0:
-        bot.send_message(message.chat.id, "Sei dentro.")
+        bot.send_message(message.chat.id, "Sei gia dentro.")
     else:
         print("Aggiunto: {}".format(user))
         bot.send_message(message.chat.id, "{} aggiunto.".format(message.from_user.first_name))
