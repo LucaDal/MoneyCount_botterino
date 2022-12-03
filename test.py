@@ -48,7 +48,7 @@ def query():
     add_Lorenzo_sql = "INSERT INTO user(id_user,name,username,id_group) VALUES(876947202, 'Straptoc', 'Straptoc', -648429536)"
     add_user_sql = "INSERT INTO user(id_user,username,id_group) VALUES(3,'bot3', 461718130)"
     to_debug = "INSERT INTO transactions(id_payer,id_debtor,id_group,value) VALUES(461718130,3,461718130,2)"
-    cur.execute(to_debug)
+    cur.execute(add_Lorenzo_sql)
     val = cur.fetchall()
     print(val)
     conn.commit()
