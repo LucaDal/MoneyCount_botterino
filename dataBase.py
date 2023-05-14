@@ -20,11 +20,17 @@ def create_connection():
 
 
 def sql_table_statment(conn):
+    sql_create_group_table = """CREATE TABLE IF NOT EXISTS group_info(
+                                id_group integer PRIMARY KEY,
+                                group_name text NOT NULL
+                                );"""
+
     sql_create_user_table = """CREATE TABLE IF NOT EXISTS user(
-                                id_user integer,
+                                id_user integer NOT NULL,
                                 username text NOT NULL,
-                                id_group integer,
+                                id_group integer NOT NULL,
                                 PRIMARY KEY(id_user,id_group)
+                                FOREIGN KEY (id_group) REFERENCES group_info(id_group)
                                 );"""
 
     sql_create_transactions_table = """ CREATE TABLE IF NOT EXISTS transactions (
@@ -34,23 +40,59 @@ def sql_table_statment(conn):
                                   id_group integer NOT NULL,
                                   value real,
                                   FOREIGN KEY (id_payer) REFERENCES user(id_user),
-                                  FOREIGN KEY (id_debtor) REFERENCES user(id_user)
+                                  FOREIGN KEY (id_debtor) REFERENCES user(id_user),
+                                  FOREIGN KEY (id_group) REFERENCES group_info(id_group)
                                   );
                                   """
+    deploy_tables(conn, sql_create_group_table)
     deploy_tables(conn, sql_create_user_table)
     deploy_tables(conn, sql_create_transactions_table)
 
 
-def is_user_on_db(conn, id_user, id_group):
+def get_group_name_from_id(conn, id_group):
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(1) FROM user WHERE ? = id_user AND ? = id_group", (id_user, id_group))
-    value = cur.fetchall()
-    if value[0][0] == 1:
-        return True
-    return False
+    cur.execute("SELECT group_name FROM group_info WHERE ? = id_group", (id_group,))
+    return cur.fetchall()[0][0]
+
+
+def get_group_list(conn, id_user):
+    cur = conn.cursor()
+    cur.execute("SELECT id_group FROM user WHERE ? = id_user", (id_user,))
+    return cur.fetchall()
+
+
+def is_user_on_db(conn, id_user, id_group, need_group_id=True):
+    """
+    it uses the id of the user
+    :param need_group_id: if False it only check if the id is on the db (for Private chat)
+    :param conn: db connection
+    :param id_user: id of the user on telegram
+    :param id_group: if related to the chat which is writing
+    :return: True if exists, False otherwise
+    """
+    cur = conn.cursor()
+    if need_group_id:
+        cur.execute("SELECT COUNT(1) FROM user WHERE ? = id_user AND ? = id_group", (id_user, id_group))
+        value = cur.fetchall()
+        if value[0][0] == 1:
+            return True
+        return False
+    else:
+        cur.execute("SELECT COUNT(1) FROM user WHERE ? = id_user", (id_user,))
+        value = cur.fetchall()
+        if value[0][0] > 0:
+            return True
+        return False
 
 
 def is_username_on_db(conn, username, id_group):
+    """
+    it uses the id of the user
+    :param conn: db connection
+    :param username: username of the user on telegram
+    :param id_group: if related to the chat which is writing
+    :return: True if exists, False otherwise
+    """
     cur = conn.cursor()
     cur.execute("SELECT COUNT(1) FROM user WHERE ? = username AND ? = id_group", (username, id_group))
     value = cur.fetchall()
@@ -73,9 +115,20 @@ def insert_user_into_db(conn, user):
         return 0
 
 
-def update_username(conn, id_user, id_group,username):
+def add_new_group(conn, group):
+    # check if group already exists
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(1) FROM group_info WHERE ? = id_group", (group[0],))
+    value = cur.fetchall()
+    if value[0][0] == 0:
+        print("Group added: {}".format(group[1]))
+        sql = ''' INSERT INTO group_info(id_group,group_name) VALUES(?,?) '''
+        deploy_commit(conn, sql, group)
+
+
+def update_username(conn, id_user, id_group, username):
     sql = "UPDATE user SET username = ? WHERE id_user = ? AND id_group = ?"
-    deploy_commit(conn, sql,(username,id_user,id_group))
+    deploy_commit(conn, sql, (username, id_user, id_group))
 
 
 def insert_transactions_into_db(conn, id_caller, list_usernames, value, id_group):
