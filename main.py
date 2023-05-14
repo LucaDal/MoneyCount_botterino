@@ -24,9 +24,9 @@ def start(message):
 @bot.message_handler(commands=['help'])
 def help_message(message):
     if message.chat.id == message.from_user.id:  # private chat
-        help_mes = "/GroupDebit [<groupID>]\nBilancio tra chiamante e tutti coloro che sono nel gruppo." \
+        help_mes = "/groupDebit [<groupID>]\nBilancio tra chiamante e tutti coloro che sono nel gruppo." \
                    "\n<groupID> necessario solo se mi usi in più gruppi.\n-------------" \
-                   "----\n/getGroupID\nRichiedi ID dei gruppi."
+                   "----\n/getGroupID\nRichiedi ID dei gruppi in cui sono utilizzato."
     else:  # Group chat
         help_mes = "/addMe\nNecessario per usarmi.\n-----------------\n" \
                    "/addEq <prezzo> [<username> [altri username]] || ['all']\n" \
@@ -60,14 +60,14 @@ def get_group_id(message):
     conn.close()
 
 
-@bot.message_handler(commands=['GroupDebit'])
+@bot.message_handler(commands=['groupDebit'])
 def debit_with_group(message):
     conn = db.create_connection()
     if conn is None:
         return
     if db.is_user_on_db(conn, message.from_user.id, None, False):
         group_id_list = db.get_group_list(conn, message.from_user.id)
-        if len(group_id_list) == 5:
+        if len(group_id_list) == 1:
             get_debit_group(message, group_id_list[0][0], conn)
         else:
             text = get_list_from_message(message)
@@ -197,10 +197,11 @@ def get_value_and_username_connection(message):
         bot.send_message(message.chat.id, "Il primo valore è numerico.")
         return None
     elif val == 0:
-        bot.send_message(message.chat.id, "Non darmi prezzo 0 per favore.")
+        bot.send_message(message.chat.id, "Sus.")
         return None
     username = get_list_of_usernames_if_correct_first_value_is_numeric(conn, message, message_as_list)
     if username is None:
+        bot.send_message(message.chat.id, "Inserisci un username.")
         return None
     if len(username) != 1:
         bot.send_message(message.chat.id, "Necessito di un solo username.")
@@ -263,14 +264,14 @@ def get_debit_group(message, group_id=None, conn=None):
     # is needed otherwise when i call get_balance_with it will search for usernames into this text
     if len(list_group) != 0:
         for user in list_group:
-            get_balance_with(message, user, True, conn)
+            get_balance_with(message, user, True, conn, group_id)
     else:
         bot.send_message(message.chat.id, "Nessuno nel gruppo.")
     conn.close()
 
 
 @bot.message_handler(commands=['debitWith'])
-def get_balance_with(message, user="", called_by_debit_group=False, conn=None):
+def get_balance_with(message, user="", called_by_debit_group=False, conn=None, group_id=None):
     """
     print into the chat the balance with the username selected
     """
@@ -279,6 +280,9 @@ def get_balance_with(message, user="", called_by_debit_group=False, conn=None):
         if conn is False:
             return
     user_called = []
+
+    if group_id is None:
+        group_id = message.chat.id
     if called_by_debit_group is False:
         user_called = get_list_of_usernames_if_correct(conn, message, get_list_from_message(message))
         if user_called is None:
@@ -286,6 +290,7 @@ def get_balance_with(message, user="", called_by_debit_group=False, conn=None):
             conn.close()
             return
     else:
+
         if user != "":
             user_called.append(user)
         else:
@@ -295,7 +300,7 @@ def get_balance_with(message, user="", called_by_debit_group=False, conn=None):
         conn.close()
         return
     try:
-        bal = truncate(db.get_balance_from(conn, message.from_user.id, user_called[0], message.chat.id), 2)
+        bal = truncate(db.get_balance_from(conn, message.from_user.id, user_called[0], group_id), 2)
         if bal < 0:
             bot.send_message(message.chat.id, "Devi {}€\na: {}".format(abs(bal), user_called[0]))
         elif bal == 0:
@@ -457,9 +462,11 @@ def is_connection_all_right(message):
     if conn is None:
         bot.send_message(message.chat.id, "Problemi con il db.")
         return False
-    if not is_caller_on_db(conn, message.chat.id, [message.from_user.username]):
-        return False
-    return conn
+    if is_message_in_group(message):
+        if not is_caller_on_db(conn, message.chat.id, [message.from_user.username]):
+            return False
+        return conn
+    return False
 
 
 def is_message_in_group(message):
