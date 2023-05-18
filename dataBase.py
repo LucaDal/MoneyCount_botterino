@@ -15,11 +15,26 @@ def create_connection():
         return conn
     except Error as e:
         print(e)
-
     return conn
 
 
 def sql_table_statment(conn):
+    sql_create_turn_duty_user_table = """CREATE TABLE IF NOT EXISTS turn_duty_user(
+                                id_user integer NOT NULL,
+                                id_group integer NOT NULL,
+                                turn integer NOT NULL,
+                                PRIMARY KEY(id_user,id_group),
+                                FOREIGN KEY (id_group) REFERENCES group_info(id_group),
+                                FOREIGN KEY (id_user) REFERENCES user(id_user)
+                                );"""
+    sql_create_duty_schedule_table = """CREATE TABLE IF NOT EXISTS duty_schedule(
+                                name text NOT NULL,
+                                id_group integer NOT NULL,
+                                turn integer NOT NULL,
+                                PRIMARY KEY(name,id_group),
+                                FOREIGN KEY (id_group) REFERENCES group_info(id_group)
+                                );"""
+
     sql_create_group_table = """CREATE TABLE IF NOT EXISTS group_info(
                                 id_group integer PRIMARY KEY,
                                 group_name text NOT NULL
@@ -44,9 +59,42 @@ def sql_table_statment(conn):
                                   FOREIGN KEY (id_group) REFERENCES group_info(id_group)
                                   );
                                   """
+    deploy_tables(conn, sql_create_duty_schedule_table)
+    deploy_tables(conn, sql_create_turn_duty_user_table)
     deploy_tables(conn, sql_create_group_table)
     deploy_tables(conn, sql_create_user_table)
     deploy_tables(conn, sql_create_transactions_table)
+
+
+def update_turn_user(conn, id_group, id_user):
+    """
+    aggiorna la tabella decrementando l'ordine e mettendo il primo in fondo alla fila
+    :param id_user:
+    :param conn:
+    :param id_group:
+    """
+    ## TODO migliorare
+    sql = "SELECT MAX(turn) FROM turn_duty_user where id_group = ? GROUP BY turn"
+    max_turn = execute_sql_without_commit(conn, sql, (id_group,))[0][0]
+    print(max_turn)
+    sql = "DELETE FROM turn_duty_user WHERE id_user = ? AND id_group = ?"
+    deploy_commit(conn, sql, (id_user, id_group))
+    sql = "UPDATE turn_duty_user SET turn = turn - 1 WHERE id_group = ?"
+    deploy_commit(conn, sql, (id_group,))
+    query = ''' INSERT INTO turn_duty_user(id_user,id_group,turn) VALUES(?,?,?) '''
+    deploy_commit(conn, query, (id_user, id_group, max_turn))
+
+
+def get_turn_user(conn, id_group):
+    cur = conn.cursor()
+    cur.execute("SELECT id_user FROM turn_duty_user WHERE ? = id_group ORDER BY turn ASC", (id_group,))
+    return cur.fetchall()
+
+
+def set_new_schedule(conn, name, id_group, frequency, delay_response):
+    query = ''' INSERT INTO schedule(name,id_group,frequency,delay_response) VALUES(?,?,?,?) '''
+    deploy_commit(conn, query, (name, id_group, frequency, delay_response))
+    return
 
 
 def get_group_name_from_id(conn, id_group):
@@ -131,6 +179,11 @@ def update_username(conn, id_user, id_group, username):
     deploy_commit(conn, sql, (username, id_user, id_group))
 
 
+def insert_turn_duty_user_into_db(conn, id_group, user, turn):
+    sql = ''' INSERT INTO turn_duty_user(id_group,id_user,turn) VALUES(?,?,?) '''
+    deploy_commit(conn, sql, (id_group, get_id_from_username(conn, user), turn))
+
+
 def insert_transactions_into_db(conn, id_caller, list_usernames, value, id_group):
     """
     Create a new transaction into the transaction table
@@ -147,6 +200,11 @@ def insert_transactions_into_db(conn, id_caller, list_usernames, value, id_group
 def get_id_from_username(conn, username):
     sql = "SELECT id_user FROM user WHERE username = ?"
     return execute_sql_without_commit(conn, sql, (username,))[0][0]
+
+
+def get_username_from_id(conn, id):
+    sql = "SELECT username FROM user WHERE id_user = ?"
+    return execute_sql_without_commit(conn, sql, (id,))[0][0]
 
 
 def remove_transactions_between(conn, id_payer, id_debtor, id_group):
@@ -208,7 +266,6 @@ def deploy_tables(conn, sql):
 
 def call_create_tables():
     conn = create_connection()
-    print(conn)
     if conn is not None:
         print("sto creando le tabelle")
         sql_table_statment(conn)
