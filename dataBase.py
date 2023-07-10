@@ -30,7 +30,8 @@ def sql_table_statment(conn):
     sql_create_duty_schedule_table = """CREATE TABLE IF NOT EXISTS duty_schedule(
                                 name text NOT NULL,
                                 id_group integer NOT NULL,
-                                turn integer NOT NULL,
+                                frequency integer NOT NULL,
+                                delay_response integer NOT NULL,
                                 PRIMARY KEY(name,id_group),
                                 FOREIGN KEY (id_group) REFERENCES group_info(id_group)
                                 );"""
@@ -85,14 +86,34 @@ def update_turn_user(conn, id_group, id_user):
     deploy_commit(conn, query, (id_user, id_group, max_turn))
 
 
-def get_turn_user(conn, id_group):
+def get_duty_schedule_by_group_id(conn, id_group):
+    """"
+    :param conn:
+    :param id_group:
+    :return: name ,id_group ,frequency,delay_response,
+    """
+    sql = "SELECT * FROM duty_schedule WHERE ? = id_group"
+    return execute_sql_without_commit(conn, sql, (id_group,))
+
+
+def delete_if_duty_already_setted(conn, name, id_group):
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(1) FROM duty_schedule WHERE ? = name AND ? = id_group", (name, id_group))
+    value = cur.fetchall()
+    if value[0][0] == 1:
+        sql = "DELETE FROM duty_schedule WHERE name = ? AND id_group = ?"
+        deploy_commit(conn, sql, (name, id_group))
+    return False
+
+
+def get_turn_user_in_order_asc(conn, id_group):
     cur = conn.cursor()
     cur.execute("SELECT id_user FROM turn_duty_user WHERE ? = id_group ORDER BY turn ASC", (id_group,))
     return cur.fetchall()
 
 
 def set_new_schedule(conn, name, id_group, frequency, delay_response):
-    query = ''' INSERT INTO schedule(name,id_group,frequency,delay_response) VALUES(?,?,?,?) '''
+    query = ''' INSERT INTO duty_schedule(name,id_group,frequency,delay_response) VALUES(?,?,?,?) '''
     deploy_commit(conn, query, (name, id_group, frequency, delay_response))
     return
 

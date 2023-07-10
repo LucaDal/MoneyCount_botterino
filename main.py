@@ -56,7 +56,7 @@ def set_duty_turn(message):
     if user_list is None:
         return
     for i in range(len(user_list)):
-        db.insert_turn_duty_user_into_db(conn, message.chat.id, user_list[i], i+1)
+        db.insert_turn_duty_user_into_db(conn, message.chat.id, user_list[i], i + 1)
     bot.send_message(message.chat.id, "turni aggiornati")
 
 
@@ -79,47 +79,69 @@ def schedule_delay(name_task, id_group):
     """
     username = ""
     for key, val in name_schedule.items():
-        if val[0] == name_task and val[1] == id_group:
+        if val[0] == name_task and val[1] == id_group and val[3] == "in time":
             schedule.cancel_job(key)
             username = get_username_from_db(val[2])
+            key_to_remove = key
     bot.send_message(id_group, "{} ti ricordo: {}!".format(username, name_task))
 
 
 @bot.message_handler(commands=['done', 'fatto', 'ok'])
-def job_done(message):  # TODO se tocca al suo turno => stop task
+def job_done(message):
     conn = db.create_connection()
     if conn is None:
         return
-    list_turn = db.get_turn_user(conn,message.chat.id)
+    id_chat = message.chat.id
+    list_turn = db.get_turn_user_in_order_asc(conn, id_chat)
     if list_turn[0][0] == message.from_user.id:
         db.update_turn_user(conn, message.chat.id, message.from_user.id)
-    #set_new_schedule() #TODO richiamare il db e prendere le informazioni
+    # get info from db
+    duty_info = db.get_duty_schedule_by_group_id(conn,id_chat)
+    print(duty_info)
+    name_task, frequency, delay_response = duty_info[0][0], duty_info[0][2], duty_info[0][3]
+
+    # Remove value that isn't needed
+    keys_to_delete = []
     for key, val in name_schedule.items():
-        if val[0] == name_task and val[1] == id_group:
-            schedule.cancel_job(key)
+        if val[0] == name_task and val[1] == id_chat:
+            if val[3] == "delayed":
+                schedule.cancel_job(key)
+            keys_to_delete.append(key)
+    for key in keys_to_delete:
+        name_schedule.pop(key)
+
+    # Ricreate the task again
+    set_new_schedule(conn, name_task, id_chat, frequency, delay_response, list_turn[0][0], True)
 
 
 def schedule_job(name_task, id_group, id_user_turn, delay_response):
     bot.send_message(id_group, "{} {}".format(get_username_from_db(id_user_turn), name_task))
     # set a reminder
-    schedule.every(delay_response).seconds.do(schedule_delay, name_task, id_group)
-    ## TODO Aggiungere il task all Dir
+    tag = schedule.every(delay_response).seconds.do(schedule_delay, name_task, id_group)
+    name_schedule[tag] = (name_task, id_group, id_user_turn, "delayed")
 
-def set_new_schedule(conn, name, id_group, frequency, delay_response, id_user_turn):
+
+def get_keys_from_value(d, name, id):
+    return [k for k, v in d.items() if v[0] == name and v[1] == id]
+
+
+def set_new_schedule(conn, name, id_group, frequency, delay_response, id_user_turn, already_set=False):
     """
     it start schedule job, and after some delay, if it won't get a notification that the jobe is done
     then, after delay_response time, it will send new messages
+    :param already_set: data has already setted, is true when called from the delay_task
     :param id_user_turn:
     :param name: of the schedule
     :param id_group: id of the chat
     :param frequency: time between notification
     :param delay_response: time before new messages start warning!
-    :return: id of the user that has to do this task!
     """
-    # db.set_new_schedule(conn, name, id_group, frequency, delay_response)
+    if not already_set:# TODO eliminare se creo task uguale
+        db.delete_if_duty_already_setted(conn, name, id_group)
+        db.set_new_schedule(conn, name, id_group, frequency, delay_response)
+
     tag = schedule.every(frequency).seconds.do(schedule_job, name, id_group, id_user_turn, delay_response)
-    name_schedule[tag] = (name, id_group, id_user_turn)
-    return True
+    name_schedule[tag] = (name, id_group, id_user_turn, "in time")
 
 
 @bot.message_handler(commands=['setSchedule'])
@@ -128,7 +150,7 @@ def new_schedule(message):
     conn = db.create_connection()
     if conn is None:
         return
-    order_list = db.get_turn_user(conn, message.chat.id)
+    order_list = db.get_turn_user_in_order_asc(conn, message.chat.id)
     # controllo se esiste un ordine nel gruppo
     if len(order_list) == 0:
         bot.send_message(message.chat.id,
@@ -152,8 +174,8 @@ def new_schedule(message):
                                           "che riaccad")
         conn.close()
         return
-    if set_new_schedule(conn, text_list[0], message.chat.id, int(text_list[1]), int(text_list[2]), order_list[0][0]):
-        bot.send_message(message.chat.id, "novo schedule \"{}\" settato".format(text_list[0]))
+    set_new_schedule(conn, text_list[0], message.chat.id, int(text_list[1]), int(text_list[2]), order_list[0][0])
+    bot.send_message(message.chat.id, "novo schedule \"{}\" settato".format(text_list[0]))
     conn.close()
 
 
